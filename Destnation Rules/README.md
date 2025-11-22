@@ -1,11 +1,13 @@
 
-# Destination Rules Lab
 
-Welcome to the **Destination Rules Lab**. By the end of this lab, you will learn how to configure **Destination Rules** and **Virtual Services** in the Istio Service Mesh.
+# 🚀 Destination Rules Lab
+
+Welcome to the **Destination Rules Lab**.
+By the end of this lab, you will understand how to configure **Destination Rules** and **Virtual Services** to control service-to-service traffic in the **Istio Service Mesh**.
 
 ---
 
-## 1. Verify Namespace Labels
+# 🧭 1. Verify Namespace Labels
 
 ```bash
 kubectl get ns --show-labels
@@ -17,29 +19,26 @@ Example output:
 NAME              STATUS   AGE     LABELS
 default           Active   34m     istio-injection=enabled,kubernetes.io/metadata.name=default
 istio-system      Active   2m52s   kubernetes.io/metadata.name=istio-system
-kube-node-lease   Active   34m     kubernetes.io/metadata.name=kube-node-lease
-kube-public       Active   34m     kubernetes.io/metadata.name=kube-public
-kube-system       Active   34m     kubernetes.io/metadata.name=kube-system
+...
 ```
 
 ---
 
-## 2. Deploy the Hello World Application
+# 📦 2. Deploy the Hello World Application
 
 ```bash
 kubectl apply -f https://raw.githubusercontent.com/istio/istio/master/samples/helloworld/helloworld.yaml
 ```
 
-Check deployments:
+Verify deployments:
 
 ```bash
 kubectl get deployments.apps
 ```
 
 ```
-NAME            READY   UP-TO-DATE   AVAILABLE   AGE
-helloworld-v1   1/1     1            1           21s
-helloworld-v2   1/1     1            1           21s
+helloworld-v1   1/1   Running
+helloworld-v2   1/1   Running
 ```
 
 Check services:
@@ -48,31 +47,43 @@ Check services:
 kubectl get svc
 ```
 
-```
-NAME         TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)    AGE
-helloworld   ClusterIP   10.107.100.199   <none>        5000/TCP   34s
-kubernetes   ClusterIP   10.96.0.1        <none>        443/TCP    36m
-```
-
 ---
 
-## 3. Verify Sidecar Injection
+# 🧊 **Architecture Diagram: HelloWorld App**
 
-Both pods must show `2/2` containers running:
+
+```mermaid
+flowchart LR
+
+    A[Test Pod] --> B[Envoy Sidecar]
+    B --> C[Virtual Service<br/>Routing Rules]
+
+    C --> D1[Subset v1 Pod]
+    C --> D2[Subset v2 Pod]
+
+    subgraph DestinationRule Subsets
+        D1
+        D2
+    end
+```
+
+
+# 🧪 3. Verify Sidecar Injection
+
+Both pods should show **2/2** containers:
 
 ```bash
 kubectl get pods
 ```
 
 ```
-NAME                             READY   STATUS    RESTARTS   AGE
-helloworld-v1-5787f49bd8-bhwp7   2/2     Running   0          67s
-helloworld-v2-6746879bdd-5nfpm   2/2     Running   0          67s
+helloworld-v1   2/2 Running
+helloworld-v2   2/2 Running
 ```
 
 ---
 
-## 4. Create a Test Namespace and Pod
+# 🧰 4. Create Test Namespace and Pod
 
 ```bash
 kubectl create ns test --dry-run=client -o yaml > test_ns.yaml
@@ -82,137 +93,157 @@ kubectl run test --image=nginx -n test --dry-run=client -o yaml > test_pod.yaml
 kubectl apply -f test_pod.yaml
 ```
 
-Confirm injection:
+Verify:
 
 ```bash
 kubectl get ns test --show-labels
 kubectl get po -n test
 ```
 
-```
-NAME   READY   STATUS    RESTARTS   AGE
-test   2/2     Running   0          11s
-```
-
 ---
 
-## 5. Verify Hello World Service
+# 🌐 5. Verify HelloWorld Service
 
 ```bash
-kubectl get svc
+kubectl get svc helloworld
 ```
 
 ```
-NAME         TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)    AGE
-helloworld   ClusterIP   10.107.100.199   <none>        5000/TCP   4m37s
+PORT(S): 5000/TCP
 ```
 
 ---
 
-## 6. Test Connectivity from the Test Pod
+# 🧭 6. Test Connectivity from Test Pod
 
 ```bash
 kubectl exec -ti -n test test -- curl helloworld.default.svc.cluster.local:5000/hello
 ```
 
-Example responses:
+Example output (round-robin default):
 
 ```
-Hello version: v2, instance: helloworld-v2-6746879bdd-5nfpm
-Hello version: v1, instance: helloworld-v1-5787f49bd8-bhwp7
+Hello version: v1...
+Hello version: v2...
 ```
 
 ---
 
-## 7. Review Pod Labels
+# 🏷️ 7. Review Pod Labels
 
 ```bash
 kubectl get pods --show-labels
 ```
 
-This confirms that labels such as `version: v1` and `version: v2` are applied and used by Istio.
+Confirms:
+
+* v1 → `version: v1`
+* v2 → `version: v2`
+
+These labels are critical for routing.
 
 ---
 
-## 8. Export the Hello World Service Definition
+# 📤 8. Export the HelloWorld Service Definition
 
 ```bash
 kubectl get svc helloworld -o yaml > helloWorldSvc.yaml
 ```
 
-> **Note:**
-> The service route is determined **only by the selector field**.
-> Other labels (such as `service: helloworld`) do **not** affect routing.
+> Only `.spec.selector` determines routing.
+> Additional labels do **not** affect traffic.
 
 ---
 
-## 9. Apply the Destination Rule
+# 🎯 9. Apply Destination Rule
 
 ```bash
 kubectl apply -f destinationRules.yaml
 ```
 
-Verify:
+Validate:
 
 ```bash
 kubectl get destinationrules
 ```
 
 ```
-NAME             HOST         AGE
-hello-world-ds   helloworld   59s
+hello-world-ds   helloworld
 ```
 
 ---
 
-## 10. Apply the Virtual Service
+# ⚙️ 10. Apply the Virtual Service
 
 ```bash
 kubectl apply -f virtualService.yaml
-```
-
-Check Virtual Service:
-
-```bash
 kubectl get vs
 ```
 
 ```
-NAME             GATEWAYS   HOSTS            AGE
-hello-world-vs              ["helloworld"]   5s
+HOSTS: ["helloworld"]
+```
+
+This will control traffic between v1 and v2.
+
+---
+
+# 🔀 **Diagram: DestinationRule + VirtualService Routing**
+
+```mermaid
+flowchart LR
+
+A[Test Pod] --> B[Envoy Sidecar]
+
+B --> C[Virtual Service<br/>Traffic Rules]
+
+C -->|Subset: v1| D1[v1 Pod]
+C -->|Subset: v2| D2[v2 Pod]
+
+subgraph DestinationRule
+D1:::greenStyle
+D2:::blueStyle
+end
+
+classDef greenStyle fill:#d4edda,stroke:#155724,color:#0f3e1f;
+classDef blueStyle fill:#cce5ff,stroke:#004085,color:#003366;
 ```
 
 ---
 
-## 11. Test Traffic Splitting (Default)
+# 🔁 11. Test Default 50/50 Traffic Split
 
-Execute multiple curl commands:
-
-```
-curl helloworld.default.svc.cluster.local:5000/hello
+```bash
+kubectl exec -ti -n test test -- curl helloworld.default.svc.cluster.local:5000/hello
 ```
 
-You should see alternating responses from **v1** and **v2**.
-
-Example:
+Expected alternating output:
 
 ```
-Hello version: v1...
-Hello version: v2...
 Hello version: v1...
 Hello version: v2...
 ```
 
 ---
 
-## 12. Update Virtual Service for 90/10 Traffic Split
+# 📊 **Diagram: Default 50/50 Split**
 
-Modify the Virtual Service to send:
+```mermaid
+pie title Default Traffic Split (No weights)
+    "v1" : 50
+    "v2" : 50
+```
+
+---
+
+# 🎚️ 12. Update Virtual Service to 90/10 Split
+
+Modify VirtualService:
 
 * **90% → v1**
 * **10% → v2**
 
-Apply the update:
+Apply:
 
 ```bash
 kubectl apply -f virtualService.yaml
@@ -226,22 +257,30 @@ kubectl exec -ti -n test test -- curl helloworld.default.svc.cluster.local:5000/
 
 Expected distribution:
 
-* v1 responses ≈ 90%
-* v2 responses ≈ 10%
+* v1 ≈ 90%
+* v2 ≈ 10%
 
-Example:
+---
 
-```
-Hello version: v1...
-Hello version: v1...
-Hello version: v1...
-Hello version: v2...
+# 📊 **Diagram: 90/10 Weighted Routing**
+
+```mermaid
+pie title Updated Traffic Split (Weighted)
+    "v1 (90%)" : 90
+    "v2 (10%)" : 10
 ```
 
 ---
 
-## Conclusion
+# 🎉 Conclusion
 
-**Destination Rules** and **Virtual Services** are powerful Istio features that enable fine-grained traffic management, allowing you to control traffic flow between different service versions.
+You have successfully learned how to:
 
+✅ Deploy a multi-version service
+✅ Apply a **Destination Rule** with subsets
+✅ Create a **Virtual Service** to route traffic
+✅ Perform traffic splitting (50/50 → 90/10)
+✅ Verify behavior using curl from inside the mesh
+
+**Destination Rules + Virtual Services = powerful, fine-grained traffic control in Istio.**
 
