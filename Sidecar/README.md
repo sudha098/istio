@@ -1,5 +1,4 @@
 
----
 
 # 🛡️ Istio Sidecars Lab
 
