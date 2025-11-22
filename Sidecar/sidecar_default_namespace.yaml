@@ -1,0 +1,14 @@
+apiVersion: networking.istio.io/v1
+kind: Sidecar
+metadata:
+  name: default
+  namespace: test
+spec:
+  workloadSelector:
+    labels:
+      run: test
+  egress:
+  - hosts:
+    - "./*"
+    - "default/*"
+    - "istio-system/*"
