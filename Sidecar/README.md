@@ -1,4 +1,4 @@
-#SIDECARS
+# SIDECARS
 
 kubectl get ns --show-labels
 
