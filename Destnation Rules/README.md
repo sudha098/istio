@@ -106,3 +106,23 @@ Hello version: v1, instance: helloworld-v1-5787f49bd8-bhwp7
 root@test:/# curl helloworld.default.svc.cluster.local:5000/hello
 Hello version: v2, instance: helloworld-v2-6746879bdd-5nfpm
 
+Modify the Virtual Service to send 90% traffic to v1 and 10% to v2.
+
+k apply -f virtualService.yaml 
+virtualservice.networking.istio.io/hello-world-vs configured
+
+To assess the new traffic distribution, execute the curl command several times. You should observe that responses from v1 appear approximately 90% of the time, while responses from v2 occur around 10% of the time.
+
+Destination Rules and Virtual Services facilitate advanced traffic management in Istio, enabling you to effectively control traffic routing between various versions of your services.
+
+kubectl exec -ti -n test test -- curl helloworld.default.svc.cluster.local:5000/hello
+Hello version: v1, instance: helloworld-v1-5787f49bd8-bhwp7
+
+root@controlplane ~ ➜  kubectl exec -ti -n test test -- curl helloworld.default.svc.cluster.local:5000/hello
+Hello version: v1, instance: helloworld-v1-5787f49bd8-bhwp7
+
+root@controlplane ~ ➜  kubectl exec -ti -n test test -- curl helloworld.default.svc.cluster.local:5000/hello
+Hello version: v1, instance: helloworld-v1-5787f49bd8-bhwp7
+
+root@controlplane ~ ➜  kubectl exec -ti -n test test -- curl helloworld.default.svc.cluster.local:5000/hello
+Hello version: v2, instance: helloworld-v2-6746879bdd-5nfpm

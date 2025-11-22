@@ -16,10 +16,10 @@ spec:
         port:
           number: 5000
         subset: v1
-      weight: 50
+      weight: 90
     - destination:
         host: helloworld.default.svc.cluster.local
         port:
           number: 5000
         subset: v2
-      weight: 50
+      weight: 10
