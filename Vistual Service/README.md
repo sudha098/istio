@@ -107,3 +107,33 @@ kubectl apply -f test_pod.yaml
 kubectl get po
 NAME                       READY   STATUS    RESTARTS   AGE
 httpbin-686d6fc899-vlcsp   2/2     Running   0          17m
+
+
+The Virtual Service is now configured to intercept traffic. Please note that requests to HTTP Bin will result in a 503 error due to the incorrect port configuration (9000).
+
+Execute the following command to test the connectivity within your Kubernetes cluster:
+
+kubectl exec -ti -n test test -- curl --head httpbin.default.svc.cluster.local:8000
+HTTP/1.1 503 Service Unavailable
+date: Sat, 22 Nov 2025 11:38:59 GMT
+server: envoy
+transfer-encoding: chunked
+
+Please rectify the Virtual Service configuration by restoring the port to 8000 and implementing a URI rewrite rule that directs /hello to /.
+
+ kubectl apply -f virtualService.yaml 
+ virtualservice.networking.istio.io/httpbin configured
+
+The Virtual Service is configured to redirect any service or client request directed at httpbin/hello to the root landing page, which can be accessed via / or httpbin. To achieve this, ensure a match is established for each rule you intend to intercept.
+
+Please test the HTTP Bin endpoints using the following commands:
+
+kubectl exec -ti -n test test -- /bin/bash
+root$ curl httpbin.default.svc.cluster.local:8000/
+root$ curl httpbin.default.svc.cluster.local:8000/ip
+root$ curl httpbin.default.svc.cluster.local:8000/user-agent
+root$ curl httpbin.default.svc.cluster.local:8000/hello
+
+The /hello endpoint has been configured to rewrite to the root endpoint (/), while other endpoints, such as /ip, continue to function as expected.
+
+Virtual Services facilitate advanced traffic routing and rewriting in Istio.
