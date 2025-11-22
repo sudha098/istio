@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"v1","kind":"Service","metadata":{"annotations":{},"labels":{"app":"helloworld","service":"helloworld"},"name":"helloworld","namespace":"default"},"spec":{"ports":[{"name":"http","port":5000}],"selector":{"app":"helloworld"}}}
+  creationTimestamp: "2025-11-22T11:58:13Z"
+  labels:
+    app: helloworld
+    service: helloworld
+  name: helloworld
+  namespace: default
+  resourceVersion: "3597"
+  uid: 4c568b7c-a917-4a00-91e9-14df85427ca7
+spec:
+  clusterIP: 10.107.100.199
+  clusterIPs:
+  - 10.107.100.199
+  internalTrafficPolicy: Cluster
+  ipFamilies:
+  - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+  - name: http
+    port: 5000
+    protocol: TCP
+    targetPort: 5000
+  selector:
+    app: helloworld
+  sessionAffinity: None
+  type: ClusterIP
+status:
+  loadBalancer: {}

@@ -1,0 +1,25 @@
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: hello-world-vs
+  namespace: default
+spec:
+  hosts:
+  - helloworld
+  http:
+  - match:
+    - uri:
+        prefix: /
+    route:
+    - destination:
+        host: helloworld.default.svc.cluster.local
+        port:
+          number: 5000
+        subset: v1
+      weight: 50
+    - destination:
+        host: helloworld.default.svc.cluster.local
+        port:
+          number: 5000
+        subset: v2
+      weight: 50
