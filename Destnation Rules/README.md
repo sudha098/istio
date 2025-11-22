@@ -1,128 +1,247 @@
-# Destination Rules
 
-@Welcome to the Destination Rules Lab. By the conclusion of this lab, you will acquire the skills needed to configure Destination Rules within the Istio Service Mesh.
+# Destination Rules Lab
 
+Welcome to the **Destination Rules Lab**. By the end of this lab, you will learn how to configure **Destination Rules** and **Virtual Services** in the Istio Service Mesh.
+
+---
+
+## 1. Verify Namespace Labels
+
+```bash
 kubectl get ns --show-labels
+```
+
+Example output:
+
+```
 NAME              STATUS   AGE     LABELS
 default           Active   34m     istio-injection=enabled,kubernetes.io/metadata.name=default
 istio-system      Active   2m52s   kubernetes.io/metadata.name=istio-system
 kube-node-lease   Active   34m     kubernetes.io/metadata.name=kube-node-lease
 kube-public       Active   34m     kubernetes.io/metadata.name=kube-public
 kube-system       Active   34m     kubernetes.io/metadata.name=kube-system
+```
 
+---
+
+## 2. Deploy the Hello World Application
+
+```bash
 kubectl apply -f https://raw.githubusercontent.com/istio/istio/master/samples/helloworld/helloworld.yaml
-service/helloworld created
-deployment.apps/helloworld-v1 created
-deployment.apps/helloworld-v2 created
+```
 
-k get deployments.apps 
+Check deployments:
+
+```bash
+kubectl get deployments.apps
+```
+
+```
 NAME            READY   UP-TO-DATE   AVAILABLE   AGE
 helloworld-v1   1/1     1            1           21s
 helloworld-v2   1/1     1            1           21s
+```
 
-k get svc
+Check services:
+
+```bash
+kubectl get svc
+```
+
+```
 NAME         TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)    AGE
 helloworld   ClusterIP   10.107.100.199   <none>        5000/TCP   34s
 kubernetes   ClusterIP   10.96.0.1        <none>        443/TCP    36m
+```
 
-Please confirm that both Hello World pods are showing a status of 2/2 containers running, which indicates successful Istio sidecar injection.
+---
 
+## 3. Verify Sidecar Injection
+
+Both pods must show `2/2` containers running:
+
+```bash
 kubectl get pods
+```
+
+```
 NAME                             READY   STATUS    RESTARTS   AGE
 helloworld-v1-5787f49bd8-bhwp7   2/2     Running   0          67s
 helloworld-v2-6746879bdd-5nfpm   2/2     Running   0          67s
+```
 
+---
+
+## 4. Create a Test Namespace and Pod
+
+```bash
 kubectl create ns test --dry-run=client -o yaml > test_ns.yaml
 kubectl apply -f test_ns.yaml
 
 kubectl run test --image=nginx -n test --dry-run=client -o yaml > test_pod.yaml
 kubectl apply -f test_pod.yaml
+```
 
-k get ns test --show-labels 
-NAME   STATUS   AGE   LABELS
-test   Active   72s   istio-injection=enabled,kubernetes.io/metadata.name=test
+Confirm injection:
 
-k get po -n test
+```bash
+kubectl get ns test --show-labels
+kubectl get po -n test
+```
+
+```
 NAME   READY   STATUS    RESTARTS   AGE
 test   2/2     Running   0          11s
+```
 
+---
 
-Please verify the services associated with the Hello World App by executing the command kubectl get svc.
+## 5. Verify Hello World Service
 
-You should observe a service named helloworld that is listening on port 5000. Execute the following command to verify:
-
+```bash
 kubectl get svc
+```
+
+```
 NAME         TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)    AGE
 helloworld   ClusterIP   10.107.100.199   <none>        5000/TCP   4m37s
-kubernetes   ClusterIP   10.96.0.1        <none>        443/TCP    40m
+```
 
-Please verify the accessibility of the Hello World service from the test pod by executing the following command:
+---
 
+## 6. Test Connectivity from the Test Pod
+
+```bash
 kubectl exec -ti -n test test -- curl helloworld.default.svc.cluster.local:5000/hello
+```
+
+Example responses:
+
+```
 Hello version: v2, instance: helloworld-v2-6746879bdd-5nfpm
-
-kubectl exec -ti -n test test -- curl helloworld.default.svc.cluster.local:5000/hello
 Hello version: v1, instance: helloworld-v1-5787f49bd8-bhwp7
+```
 
+---
+
+## 7. Review Pod Labels
+
+```bash
 kubectl get pods --show-labels
-NAME                             READY   STATUS    RESTARTS   AGE     LABELS
-helloworld-v1-5787f49bd8-bhwp7   2/2     Running   0          7m10s   app=helloworld,pod-template-hash=5787f49bd8,security.istio.io/tlsMode=istio,service.istio.io/canonical-name=helloworld,service.istio.io/canonical-revision=v1,version=v1
-helloworld-v2-6746879bdd-5nfpm   2/2     Running   0          7m10s   app=helloworld,pod-template-hash=6746879bdd,security.istio.io/tlsMode=istio,service.istio.io/canonical-name=helloworld,service.istio.io/canonical-revision=v2,version=v2
+```
 
+This confirms that labels such as `version: v1` and `version: v2` are applied and used by Istio.
 
+---
+
+## 8. Export the Hello World Service Definition
+
+```bash
 kubectl get svc helloworld -o yaml > helloWorldSvc.yaml
+```
 
-Please observe that the Hello World Service is routing traffic to pods labeled with app: helloworld. While the service itself has a service: helloworld label, this label is not part of the service's selector and does not influence routing. Only the selector field determines which pods receive traffic.
+> **Note:**
+> The service route is determined **only by the selector field**.
+> Other labels (such as `service: helloworld`) do **not** affect routing.
 
-kubectl apply -f destinationRules.yaml 
-destinationrule.networking.istio.io/hello-world-ds created
+---
 
+## 9. Apply the Destination Rule
+
+```bash
+kubectl apply -f destinationRules.yaml
+```
+
+Verify:
+
+```bash
 kubectl get destinationrules
+```
+
+```
 NAME             HOST         AGE
 hello-world-ds   helloworld   59s
+```
 
-kubectl apply -f virtualService.yaml 
-virtualservice.networking.istio.io/hello-world-vs created
+---
 
+## 10. Apply the Virtual Service
+
+```bash
+kubectl apply -f virtualService.yaml
+```
+
+Check Virtual Service:
+
+```bash
 kubectl get vs
+```
+
+```
 NAME             GATEWAYS   HOSTS            AGE
 hello-world-vs              ["helloworld"]   5s
+```
 
-To test traffic splitting, execute the curl command multiple times from the test pod. You should observe responses alternating between the v1 and v2 versions.
+---
 
-root@test:/# 
-root@test:/# curl helloworld.default.svc.cluster.local:5000/hello
-Hello version: v1, instance: helloworld-v1-5787f49bd8-bhwp7
-root@test:/# curl helloworld.default.svc.cluster.local:5000/hello
-Hello version: v2, instance: helloworld-v2-6746879bdd-5nfpm
-root@test:/# curl helloworld.default.svc.cluster.local:5000/hello
-Hello version: v1, instance: helloworld-v1-5787f49bd8-bhwp7
-root@test:/# curl helloworld.default.svc.cluster.local:5000/hello
-Hello version: v1, instance: helloworld-v1-5787f49bd8-bhwp7
-root@test:/# curl helloworld.default.svc.cluster.local:5000/hello
-Hello version: v2, instance: helloworld-v2-6746879bdd-5nfpm
-root@test:/# curl helloworld.default.svc.cluster.local:5000/hello
-Hello version: v1, instance: helloworld-v1-5787f49bd8-bhwp7
-root@test:/# curl helloworld.default.svc.cluster.local:5000/hello
-Hello version: v2, instance: helloworld-v2-6746879bdd-5nfpm
+## 11. Test Traffic Splitting (Default)
 
-Modify the Virtual Service to send 90% traffic to v1 and 10% to v2.
+Execute multiple curl commands:
 
-k apply -f virtualService.yaml 
-virtualservice.networking.istio.io/hello-world-vs configured
+```
+curl helloworld.default.svc.cluster.local:5000/hello
+```
 
-To assess the new traffic distribution, execute the curl command several times. You should observe that responses from v1 appear approximately 90% of the time, while responses from v2 occur around 10% of the time.
+You should see alternating responses from **v1** and **v2**.
 
-Destination Rules and Virtual Services facilitate advanced traffic management in Istio, enabling you to effectively control traffic routing between various versions of your services.
+Example:
 
+```
+Hello version: v1...
+Hello version: v2...
+Hello version: v1...
+Hello version: v2...
+```
+
+---
+
+## 12. Update Virtual Service for 90/10 Traffic Split
+
+Modify the Virtual Service to send:
+
+* **90% → v1**
+* **10% → v2**
+
+Apply the update:
+
+```bash
+kubectl apply -f virtualService.yaml
+```
+
+Test repeatedly:
+
+```bash
 kubectl exec -ti -n test test -- curl helloworld.default.svc.cluster.local:5000/hello
-Hello version: v1, instance: helloworld-v1-5787f49bd8-bhwp7
+```
 
-root@controlplane ~ ➜  kubectl exec -ti -n test test -- curl helloworld.default.svc.cluster.local:5000/hello
-Hello version: v1, instance: helloworld-v1-5787f49bd8-bhwp7
+Expected distribution:
 
-root@controlplane ~ ➜  kubectl exec -ti -n test test -- curl helloworld.default.svc.cluster.local:5000/hello
-Hello version: v1, instance: helloworld-v1-5787f49bd8-bhwp7
+* v1 responses ≈ 90%
+* v2 responses ≈ 10%
 
-root@controlplane ~ ➜  kubectl exec -ti -n test test -- curl helloworld.default.svc.cluster.local:5000/hello
-Hello version: v2, instance: helloworld-v2-6746879bdd-5nfpm
+Example:
+
+```
+Hello version: v1...
+Hello version: v1...
+Hello version: v1...
+Hello version: v2...
+```
+
+---
+
+## Conclusion
+
+**Destination Rules** and **Virtual Services** are powerful Istio features that enable fine-grained traffic management, allowing you to control traffic flow between different service versions.
+
+
