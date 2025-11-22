@@ -1,5 +1,4 @@
 
-
 # 🌐 Istio Virtual Service Lab
 
 This lab demonstrates how **Istio Virtual Services** control routing, port overrides, and URI rewriting for services inside the mesh.
@@ -176,44 +175,36 @@ Result:
 
 # 📊 **DIAGRAMS**
 
-All diagrams render correctly on GitHub.
+All diagrams now render correctly on GitHub.
 
 ---
 
-## 1️⃣ **High-Level Request Flow (With & Without Injection)**
+## 1️⃣ High-Level Request Flow (With & Without Injection)
 
 ```mermaid
 flowchart TD
-
-    A[Test Pod (no sidecar)] -->|Bypasses Mesh| B[httpbin Service]
+    A[Test Pod no sidecar] -->|Bypasses Mesh| B[httpbin Service]
     B --> C[Direct ClusterIP Access]
 
-    A2[Test Pod (with sidecar)] -->|Traffic Intercepted by Envoy| D[VirtualService Rules]
-    D -->|Route| B
+    D[Test Pod with sidecar] -->|Traffic intercepted by Envoy| E[VirtualService Rules]
+    E -->|Route| B
 ```
 
 ---
 
-## 2️⃣ **Virtual Service Routing Logic**
+## 2️⃣ Virtual Service Routing Logic
 
 ```mermaid
 flowchart TD
-
-    classDef svc fill:#cce5ff,stroke:#004085,color:#003366
-    classDef vs fill:#ffeeba,stroke:#8a6d3b,color:#5c4731
-    classDef pod fill:#d4edda,stroke:#155724,color:#0f3e1f
-
-    A[Test Pod<br/>Sidecar Enabled] --> B[Envoy Proxy]
-
-    B --> C[VirtualService: httpbin]:::vs
-
-    C -->|Match: path "/"| D[Destination<br/>httpbin.default.svc:8000]:::svc
-    D --> E[httpbin Deployment]:::pod
+    A[Test Pod with Sidecar] --> B[Envoy Proxy]
+    B --> C[VirtualService httpbin]
+    C -->|Match path /| D[Destination httpbin.default.svc:8000]
+    D --> E[httpbin Deployment]
 ```
 
 ---
 
-## 3️⃣ **Broken Virtual Service (Bad Port = 9000)**
+## 3️⃣ Broken Virtual Service (Bad Port = 9000)
 
 ```mermaid
 flowchart TD
@@ -224,17 +215,14 @@ flowchart TD
 
 ---
 
-## 4️⃣ **URI Rewrite Rule (`/hello` → `/`)**
+## 4️⃣ URI Rewrite Rule (`/hello` → `/`)
 
 ```mermaid
 flowchart TD
-
     classDef rule fill:#fff3cd,stroke:#856404,color:#5a4400
 
     A[Test Pod] --> B[Envoy]
     B --> C[VirtualService]:::rule
-
-    C -->|Match: /hello<br/>Rewrite: "/"| D[httpbin Deployment]
+    C -->|Match: /hello, Rewrite: /| D[httpbin Deployment]
 ```
-
 
