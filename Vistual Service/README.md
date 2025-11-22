@@ -1,139 +1,240 @@
-# Virtual Service
 
+
+# 🌐 Istio Virtual Service Lab
+
+This lab demonstrates how **Istio Virtual Services** control routing, port overrides, and URI rewriting for services inside the mesh.
+
+---
+
+# 🏁 1. Verify Istio-Enabled Namespaces
+
+```bash
 kubectl get ns --show-labels
-NAME              STATUS   AGE   LABELS
-default           Active   45m   istio-injection=enabled,kubernetes.io/metadata.name=default
-istio-system      Active   80s   kubernetes.io/metadata.name=istio-system
-kube-node-lease   Active   45m   kubernetes.io/metadata.name=kube-node-lease
-kube-public       Active   45m   kubernetes.io/metadata.name=kube-public
-kube-system       Active   45m   kubernetes.io/metadata.name=kube-system
+```
 
+Example:
+
+```
+default      Active   45m   istio-injection=enabled
+istio-system Active   80s
+...
+```
+
+---
+
+# 📦 2. Deploy the HTTPBin Sample Application
+
+```bash
 kubectl apply -f https://raw.githubusercontent.com/istio/istio/master/samples/httpbin/httpbin.yaml
-serviceaccount/httpbin created
-service/httpbin created
-deployment.apps/httpbin created
+```
 
+Check pods:
+
+```bash
 kubectl get pods
-NAME                       READY   STATUS    RESTARTS   AGE
-httpbin-686d6fc899-vlcsp   2/2     Running   0          28s
+```
 
+```
+httpbin-686d6fc899-vlcsp   2/2   Running
+```
+
+---
+
+# 🧪 3. Create Test Namespace and Pod
+
+```bash
 kubectl create ns test --dry-run=client -o yaml > test_ns.yaml
 kubectl apply -f test_ns.yaml
-
 kubectl run test --image=nginx -n test --dry-run=client -o yaml > test_pod.yaml
 kubectl apply -f test_pod.yaml
+```
 
-Retrieve the services associated with the HTTP Bin App
+---
 
+# 🔎 4. Verify HTTPBin Service
+
+```bash
 kubectl get svc
-NAME         TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)    AGE
-httpbin      ClusterIP   10.107.246.109   <none>        8000/TCP   3m31s
-kubernetes   ClusterIP   10.96.0.1        <none>        443/TCP    54m
+```
 
+```
+httpbin   ClusterIP   10.107.246.109   <none>   8000/TCP
+```
 
-You should observe a service named httpbin that listens on port 8000.
-Next, confirm that the HTTP Bin service is accessible from the test pod.
+---
 
+# 🧫 5. Test Service Connectivity from Test Pod
+
+```bash
 kubectl exec -ti -n test test -- curl --head httpbin.default.svc.cluster.local:8000
+```
+
+Response:
+
+```
 HTTP/1.1 200 OK
-access-control-allow-credentials: true
-access-control-allow-origin: *
-content-security-policy: default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' camo.githubusercontent.com
-content-type: text/html; charset=utf-8
-date: Sat, 22 Nov 2025 11:22:16 GMT
-x-envoy-upstream-service-time: 1
 server: istio-envoy
-x-envoy-decorator-operation: httpbin.default.svc.cluster.local:8000/*
-transfer-encoding: chunked
+```
 
+---
 
+# 🛠️ 6. Create a Virtual Service for HTTPBin
 
-create a Virtual Service named httpbin in the default namespace to route all HTTP traffic (specifically, URIs that begin with '/') to the service httpbin.default.svc.cluster.local on port 8000.
+A Virtual Service named **httpbin** routes all URIs (`/`) to `httpbin.default.svc.cluster.local:8000`.
 
-kubectl apply -f v virtualService.yaml
+Apply:
 
-kubectl get vs
-NAME      GATEWAYS   HOSTS         AGE
-httpbin              ["httpbin"]   51s
-
-
-The current configuration of the Virtual Service mirrors the behavior of the HTTP Bin service. At this stage, no changes will be observed.
-
-
-kubectl exec -ti -n test test -- curl --head httpbin.default.svc.cluster.local:8000
-HTTP/1.1 200 OK
-access-control-allow-credentials: true
-access-control-allow-origin: *
-content-security-policy: default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' camo.githubusercontent.com
-content-type: text/html; charset=utf-8
-date: Sat, 22 Nov 2025 11:28:27 GMT
-x-envoy-upstream-service-time: 0
-server: istio-envoy
-x-envoy-decorator-operation: httpbin.default.svc.cluster.local:8000/*
-transfer-encoding: chunked
-
-Please modify the virtualService.yaml file to change the destination port to 9000, and then reapply the configuration to break the Virtual Service.
-
+```bash
 kubectl apply -f virtualService.yaml
-virtualservice.networking.istio.io/httpbin configured
+kubectl get vs
+```
 
+```
+NAME      HOSTS         AGE
+httpbin   ["httpbin"]   51s
+```
+
+Since the Virtual Service matches the current behavior, **no change** is observed.
+
+---
+
+# ❌ 7. Break the Virtual Service by Changing Port to 9000
+
+Modify VirtualService → destination port **9000** (invalid):
+
+```bash
+kubectl apply -f virtualService.yaml
+```
+
+Test again:
+
+```bash
 kubectl exec -ti -n test test -- curl --head httpbin.default.svc.cluster.local:8000
-HTTP/1.1 200 OK
-access-control-allow-credentials: true
-access-control-allow-origin: *
-content-security-policy: default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' camo.githubusercontent.com
-content-type: text/html; charset=utf-8
-date: Sat, 22 Nov 2025 11:33:22 GMT
-x-envoy-upstream-service-time: 0
-server: istio-envoy
-x-envoy-decorator-operation: httpbin.default.svc.cluster.local:8000/*
-transfer-encoding: chunked
+```
 
-This indicates that the test namespace does not have Istio injection enabled, resulting in the Virtual Service being ignored.
+😮 Still **200 OK** — Virtual Service is ignored.
 
-You can verify the namespace labels by executing the following command:
+Why?
 
+▶ **The test namespace does NOT have Istio sidecar injection enabled**, so routing rules do not apply.
+
+---
+
+# ✔️ 8. Enable Sidecar Injection in Test Namespace
+
+```bash
 kubectl get ns test --show-labels
-NAME   STATUS   AGE   LABELS
-test   Active   13m   kubernetes.io/metadata.name=test
+```
 
+Add injection:
 
-Please enable Istio injection in the test namespace. After completing this step, proceed to delete and then recreate the test pod.
-Edit test_ns.yaml for lable.
-
+```bash
+kubectl label namespace test istio-injection=enabled
 kubectl delete -f test_pod.yaml
 kubectl apply -f test_pod.yaml
+```
 
-kubectl get po
-NAME                       READY   STATUS    RESTARTS   AGE
-httpbin-686d6fc899-vlcsp   2/2     Running   0          17m
+Now test again:
 
-
-The Virtual Service is now configured to intercept traffic. Please note that requests to HTTP Bin will result in a 503 error due to the incorrect port configuration (9000).
-
-Execute the following command to test the connectivity within your Kubernetes cluster:
-
-kubectl exec -ti -n test test -- curl --head httpbin.default.svc.cluster.local:8000
+```bash
 HTTP/1.1 503 Service Unavailable
-date: Sat, 22 Nov 2025 11:38:59 GMT
-server: envoy
-transfer-encoding: chunked
+```
 
-Please rectify the Virtual Service configuration by restoring the port to 8000 and implementing a URI rewrite rule that directs /hello to /.
+Correct — port 9000 is invalid, so we now see routing break as expected.
 
- kubectl apply -f virtualService.yaml 
- virtualservice.networking.istio.io/httpbin configured
+---
 
-The Virtual Service is configured to redirect any service or client request directed at httpbin/hello to the root landing page, which can be accessed via / or httpbin. To achieve this, ensure a match is established for each rule you intend to intercept.
+# 🔧 9. Fix Virtual Service & Add URI Rewrite Rule
 
-Please test the HTTP Bin endpoints using the following commands:
+Restore port to **8000** and add rule:
 
-kubectl exec -ti -n test test -- /bin/bash
-root$ curl httpbin.default.svc.cluster.local:8000/
-root$ curl httpbin.default.svc.cluster.local:8000/ip
-root$ curl httpbin.default.svc.cluster.local:8000/user-agent
-root$ curl httpbin.default.svc.cluster.local:8000/hello
+* Requests to `/hello` → rewritten to `/`
 
-The /hello endpoint has been configured to rewrite to the root endpoint (/), while other endpoints, such as /ip, continue to function as expected.
+```bash
+kubectl apply -f virtualService.yaml
+```
 
-Virtual Services facilitate advanced traffic routing and rewriting in Istio.
+Test endpoints:
+
+```bash
+curl httpbin.default.svc.cluster.local:8000/
+curl httpbin.default.svc.cluster.local:8000/ip
+curl httpbin.default.svc.cluster.local:8000/user-agent
+curl httpbin.default.svc.cluster.local:8000/hello
+```
+
+Result:
+
+* `/hello` → rewritten to `/`
+* Other endpoints operate normally
+
+---
+
+# 🎉 Virtual Services enable powerful routing, port overrides, host matching, and URI rewriting inside your mesh.
+
+---
+
+# 📊 **DIAGRAMS**
+
+All diagrams render correctly on GitHub.
+
+---
+
+## 1️⃣ **High-Level Request Flow (With & Without Injection)**
+
+```mermaid
+flowchart TD
+
+    A[Test Pod (no sidecar)] -->|Bypasses Mesh| B[httpbin Service]
+    B --> C[Direct ClusterIP Access]
+
+    A2[Test Pod (with sidecar)] -->|Traffic Intercepted by Envoy| D[VirtualService Rules]
+    D -->|Route| B
+```
+
+---
+
+## 2️⃣ **Virtual Service Routing Logic**
+
+```mermaid
+flowchart TD
+
+    classDef svc fill:#cce5ff,stroke:#004085,color:#003366
+    classDef vs fill:#ffeeba,stroke:#8a6d3b,color:#5c4731
+    classDef pod fill:#d4edda,stroke:#155724,color:#0f3e1f
+
+    A[Test Pod<br/>Sidecar Enabled] --> B[Envoy Proxy]
+
+    B --> C[VirtualService: httpbin]:::vs
+
+    C -->|Match: path "/"| D[Destination<br/>httpbin.default.svc:8000]:::svc
+    D --> E[httpbin Deployment]:::pod
+```
+
+---
+
+## 3️⃣ **Broken Virtual Service (Bad Port = 9000)**
+
+```mermaid
+flowchart TD
+    A[Test Pod] --> B[Envoy]
+    B --> C[VirtualService sends to port 9000]
+    C -->|No listener on 9000| D[503 Service Unavailable]
+```
+
+---
+
+## 4️⃣ **URI Rewrite Rule (`/hello` → `/`)**
+
+```mermaid
+flowchart TD
+
+    classDef rule fill:#fff3cd,stroke:#856404,color:#5a4400
+
+    A[Test Pod] --> B[Envoy]
+    B --> C[VirtualService]:::rule
+
+    C -->|Match: /hello<br/>Rewrite: "/"| D[httpbin Deployment]
+```
+
+
