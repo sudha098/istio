@@ -1,11 +1,29 @@
-# SIDECARS
 
+---
+
+# 🛡️ Istio Sidecars Lab
+
+This lab walks you through how Istio **sidecar injection**, **peer authentication**, and **sidecar configuration scoping** affect traffic flow between namespaces.
+
+---
+
+# 📌 1. Verify Namespace Labels
+
+```bash
 kubectl get ns --show-labels
+```
 
+---
+
+# 📦 2. Deploy the Bookinfo Application
+
+```bash
 kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.11/samples/bookinfo/platform/kube/bookinfo.yaml
+```
 
-kubectl get pods
+Check pods:
 
+```
 NAME                              READY   STATUS    RESTARTS   AGE
 details-v1-54ffb59669-f5kmt       2/2     Running   0          11m
 productpage-v1-6c58956fd9-whkdn   2/2     Running   0          11m
@@ -13,139 +31,260 @@ ratings-v1-7d7546bf89-tgz68       2/2     Running   0          11m
 reviews-v1-6c7fd84f89-qrxjv       2/2     Running   0          11m
 reviews-v2-57bb9fdcdf-gcjxn       2/2     Running   0          11m
 reviews-v3-548fc5d9c7-htc5p       2/2     Running   0          11m
+```
 
+---
+
+# 🧪 3. Create a Test Namespace and Pod
+
+```bash
 kubectl create ns test --dry-run=client -o yaml > test_ns.yaml
-
 kubectl apply -f test_ns.yaml
+```
 
-k run test --image=nginx -n test --dry-run=client -o yaml
- > test_pod.yaml
+Create pod:
 
+```bash
+kubectl run test --image=nginx -n test --dry-run=client -o yaml > test_pod.yaml
 kubectl apply -f test_pod.yaml
+```
 
-kubectl get svc
-NAME          TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)    AGE
-details       ClusterIP   10.108.33.2     <none>        9080/TCP   16m
-kubernetes    ClusterIP   10.96.0.1       <none>        443/TCP    37m
-productpage   ClusterIP   10.111.102.31   <none>        9080/TCP   16m
-ratings       ClusterIP   10.102.207.34   <none>        9080/TCP   16m
-reviews       ClusterIP   10.104.29.226   <none>        9080/TCP   16m
+---
 
+# 📡 4. Access Bookinfo Before PeerAuthentication
+
+```bash
 kubectl exec -ti -n test test -- /bin/bash
+curl --head productpage.default.svc.cluster.local:9080
+```
 
-root@test:/#curl --head productpage.default.svc.cluster.local:9080
-    <!-- #Note: This works because there is no strict policy at the moment which means that all traffic can freely flow in and out of the Istio Service Mesh. -->
+This works because no strict mTLS policy is applied yet.
 
+---
+
+# 🔐 5. Apply STRICT PeerAuthentication
+
+```bash
 kubectl apply -f peerAuthentication.yaml
-
 kubectl get pa
+```
+
+Result:
+
+```
 NAME      MODE     AGE
 default   STRICT   70s
+```
 
-kubectl exec -ti -n test test -- /bin/bash
-root@test:/# curl --head productpage.default.svc.cluster.local:9080
+Test again:
+
+```
 curl: (56) Recv failure: Connection reset by peer
+```
 
+Traffic is now **blocked** because test namespace has **no sidecar injection**.
 
-kubectl get ns --show-labels
-NAME              STATUS   AGE   LABELS
-default           Active   31m   istio-injection=enabled,kubernetes.io/metadata.name=default
-...
-test              Active   18m   kubernetes.io/metadata.name=test
+---
 
+# 🧩 6. Enable Sidecar Injection in the Test Namespace
 
-kubectl label namespaces test istio-injection=enabled
-namespace/test labeled
-
+```bash
+kubectl label namespace test istio-injection=enabled
 kubectl delete -f test_pod.yaml
-
 kubectl apply -f test_pod.yaml
+```
 
-kubectl exec -ti -n test test -- /bin/bash
+Test again:
 
-root@test:/#  curl --head productpage.default.svc.cluster.local:9080
+```
 HTTP/1.1 200 OK
-content-type: text/html; charset=utf-8
-content-length: 1683
-server: envoy
-date: Tue, 15 Apr 2025 15:26:09 GMT
-x-envoy-upstream-service-time: 19
+```
 
-<!-- #It should work now because both workloads in both namespaces are now communicating through the Sidecar Proxy. -->
+Traffic now flows because **both sides have sidecars**.
 
+---
 
+# 🛑 7. Apply a Sidecar Configuration Limit
 
-<!-- There may be situations where you need to override the Sidecar’s default behavior by restricting outgoing traffic for a specific namespace or workload. You can do this by creating a Sidecar configuration to override any namespace’s default Sidecar behavior. -->
-
+```bash
 kubectl apply -f sidecar_default_namespace.yaml
-sidecar.networking.istio.io/default created
+```
 
-<!-- The Sidecar configuration restricts outgoing traffic to only the test and istio-system namespaces. Traffic to the default namespace (where the Bookinfo App resides) should now be blocked.
+This Sidecar resource **restricts outbound traffic** to:
 
-Test the Bookinfo Application from the test pod again. It should fail with an error: Empty reply from server. -->
+* test namespace
+* istio-system namespace
 
-kubectl exec -ti -n test test -- /bin/bash
-root@test:/# curl --head productpage.default.svc.cluster.local:9080
+Now test again:
+
+```
 curl: (52) Empty reply from server
+```
 
-<!-- Adjust the Sidecar configuration to allow outgoing traffic to the default namespace and reapply it.
+Blocked as expected.
 
-Update the YAML to include: -->
-- hosts:
+---
+
+# 🔧 8. Update Sidecar to Allow Default Namespace
+
+Modify the YAML hosts:
+
+```yaml
+hosts:
   - "./*"
   - "default/*"
-  - "istio-system/*" -->
+  - "istio-system/*"
+```
 
+Reapply:
 
+```bash
 kubectl apply -f sidecar_default_namespace.yaml
-sidecar.networking.istio.io/default configured
+```
 
-<!-- Verify that the Bookinfo Application is now accessible again from the test pod after updating the Sidecar configuration. -->
+Test again:
 
-kubectl exec -ti -n test test -- /bin/bash
-root@test:/# curl --head productpage.default.svc.cluster.local:9080
+```
 HTTP/1.1 200 OK
-content-type: text/html; charset=utf-8
-content-length: 1683
-server: envoy
-date: Tue, 15 Apr 2025 18:32:46 GMT
-x-envoy-upstream-service-time: 8
+```
 
-<!-- Modify the Sidecar configuration to apply only to pods with the label run: test in the test namespace. Reapply the configuration. -->
+---
 
-<!-- Add the following under spec :
+# 🎯 9. Apply workloadSelector to Restrict Certain Pods Only
+
+Add:
+
+```yaml
 workloadSelector:
-     labels:
-      run: test -->
+  labels:
+    run: test
+```
 
+Reapply:
+
+```bash
 kubectl apply -f sidecar_default_namespace.yaml
-sidecar.networking.istio.io/default configured
+```
 
-<!-- Now, check access to the Bookinfo Application from the test pod again.
+Test from **test pod**:
 
-It should now fail due to the workloadSelector restriction. -->
-
-kubectl exec -ti -n test test -- /bin/bash
-root@test:/# curl --head productpage.default.svc.cluster.local:9080
+```
 curl: (52) Empty reply from server
+```
 
+Correct — traffic is now blocked only for pods with label `run=test`.
 
-<!-- Create a new pod named nginx in the test namespace using the nginx image.
+---
 
-Verify that the new nginx pod can access the Bookinfo Application successfully.
+# 🎉 10. Create an Unrestricted Pod (nginx)
 
-
-The new nginx pod can access the Bookinfo Application because the Sidecar configuration's workloadSelector only applies to pods with the label run: test. The nginx pod has a different label and thus isn't affected by the restrictions. -->
-
+```bash
 kubectl run nginx --image=nginx -n test --dry-run=client -o yaml > nginx_pod.yaml
-
 kubectl apply -f nginx_pod.yaml
+```
 
-kubectl exec -ti -n test nginx -- /bin/bash
-root@nginx:/# curl --head productpage.default.svc.cluster.local:9080
+Test access:
+
+```
 HTTP/1.1 200 OK
-content-type: text/html; charset=utf-8
-content-length: 1683
-server: envoy
-date: Tue, 15 Apr 2025 18:57:55 GMT
-x-envoy-upstream-service-time: 4
+```
+
+The nginx pod **can access** Bookinfo because the Sidecar config applies ONLY to pods labeled `run=test`.
+
+---
+
+# 🔷 **DIAGRAMS SECTION**
+
+Below are all diagrams as requested.
+
+---
+
+# 1️⃣ High-Level Flow: Sidecar Behavior
+
+```mermaid
+flowchart TD
+
+    A[Test pod<br/>No sidecar] -->|Before STRICT| B[Bookinfo Services]
+
+    A2[Test pod<br/>With sidecar] -->|After STRICT| B
+
+    B --> C[Envoy mTLS<br/>Sidecar-to-Sidecar]
+```
+
+---
+
+# 2️⃣ mTLS Enforcement Flow
+
+```mermaid
+sequenceDiagram
+    participant T as Test Pod
+    participant E1 as Envoy (Test Namespace)
+    participant M as mTLS Policy (PeerAuthentication)
+    participant E2 as Envoy (Default NS)
+    participant S as Productpage Service
+
+    T->>S: Request without sidecar
+    Note over M: STRICT mTLS requires<br/>sidecar-to-sidecar
+    M-->>T: Connection reset
+
+    T->>E1: Request with sidecar
+    E1->>E2: mTLS encrypted request
+    E2->>S: HTTP request
+    S-->>T: 200 OK
+```
+
+---
+
+# 3️⃣ Outbound Restriction with Sidecar Resource
+
+```mermaid
+flowchart TD
+    classDef allow fill:#c8f7c5,stroke:#2b8a3e,color:#1b5e20
+    classDef deny fill:#f7c5c5,stroke:#b71c1c,color:#7f0000
+    classDef cfg fill:#fff3cd,stroke:#856404,color:#5a4400
+
+    A[Test Pod<br/>run=test] --> B[Sidecar Config]:::cfg
+
+    B -->|Allowed| C[Test Namespace]:::allow
+    B -->|Allowed| D[Istio-System Namespace]:::allow
+    B -->|Blocked| E[Default Namespace<br/>Bookinfo]:::deny
+```
+
+---
+
+# 4️⃣ After Updating Allowed Hosts
+
+```mermaid
+flowchart TD
+    A[Test Pod<br/>run=test] --> B[Updated Sidecar Config]
+    B --> C[default namespace allowed]
+    A -->|Request| D[Bookinfo Productpage]
+    D -->|200 OK| A
+```
+
+---
+
+# 5️⃣ Workload Selector Behavior
+
+```mermaid
+flowchart TD
+
+    subgraph TestNamespace
+        T1[Test Pod<br/>run=test]:::deny
+        T2[Nginx Pod<br/>no label]:::allow
+    end
+
+    classDef allow fill:#bbf7d0,stroke:#16a34a
+    classDef deny fill:#fecaca,stroke:#dc2626
+
+    SC[Sidecar Config<br/>workloadSelector: run=test]
+
+    SC --> T1
+    SC -.- T2
+
+    T1 -->|Blocked| P[Productpage]
+    T2 -->|Allowed| P
+```
+
+
+
