@@ -148,5 +148,3 @@ flowchart TD
     F -->|Traffic routed via| G
 ```
 
-
-Do you want me to do that next?
