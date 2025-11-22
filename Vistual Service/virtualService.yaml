@@ -14,4 +14,4 @@ spec:
     - destination:
         host: httpbin.default.svc.cluster.local
         port:
-          number: 8000
+          number: 9000

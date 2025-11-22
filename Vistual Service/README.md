@@ -72,3 +72,38 @@ server: istio-envoy
 x-envoy-decorator-operation: httpbin.default.svc.cluster.local:8000/*
 transfer-encoding: chunked
 
+Please modify the virtualService.yaml file to change the destination port to 9000, and then reapply the configuration to break the Virtual Service.
+
+kubectl apply -f virtualService.yaml
+virtualservice.networking.istio.io/httpbin configured
+
+kubectl exec -ti -n test test -- curl --head httpbin.default.svc.cluster.local:8000
+HTTP/1.1 200 OK
+access-control-allow-credentials: true
+access-control-allow-origin: *
+content-security-policy: default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' camo.githubusercontent.com
+content-type: text/html; charset=utf-8
+date: Sat, 22 Nov 2025 11:33:22 GMT
+x-envoy-upstream-service-time: 0
+server: istio-envoy
+x-envoy-decorator-operation: httpbin.default.svc.cluster.local:8000/*
+transfer-encoding: chunked
+
+This indicates that the test namespace does not have Istio injection enabled, resulting in the Virtual Service being ignored.
+
+You can verify the namespace labels by executing the following command:
+
+kubectl get ns test --show-labels
+NAME   STATUS   AGE   LABELS
+test   Active   13m   kubernetes.io/metadata.name=test
+
+
+Please enable Istio injection in the test namespace. After completing this step, proceed to delete and then recreate the test pod.
+Edit test_ns.yaml for lable.
+
+kubectl delete -f test_pod.yaml
+kubectl apply -f test_pod.yaml
+
+kubectl get po
+NAME                       READY   STATUS    RESTARTS   AGE
+httpbin-686d6fc899-vlcsp   2/2     Running   0          17m
