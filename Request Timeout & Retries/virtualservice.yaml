@@ -1,0 +1,14 @@
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: httpbin-vs
+spec:
+  hosts:
+    - httpbin
+  http:
+    - timeout: 2s
+      route:
+        - destination:
+            host: httpbin
+            port:
+              number: 8000
