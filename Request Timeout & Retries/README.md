@@ -1,95 +1,205 @@
-By the end of this lab, you will be able to configure timeouts and implement retry policies for Fault Injection in the Istio Service Mesh.
+# Istio Lab: Timeouts & Retry Policies
 
-Verify that your Kubernetes environment is correctly set up by checking that the default namespace is Istio enabled.
-Run: kubectl get ns --show-labels and confirm the 'istio-injection=enabled' label.
+This lab demonstrates how to configure **request timeouts** and **retry behavior** in the **Istio Service Mesh** using the `httpbin` workload.
 
-You should the see the output as:
+---
 
+## 1. Verify Istio Sidecar Injection
+
+Ensure that the **default** namespace has automatic Istio sidecar injection enabled.
+
+```bash
 kubectl get ns --show-labels
+```
+
+Expected output:
+
+```
 NAME              STATUS   AGE   LABELS
 default           Active   20m   istio-injection=enabled,kubernetes.io/metadata.name=default
 istio-system      Active   79s   kubernetes.io/metadata.name=istio-system
 kube-node-lease   Active   20m   kubernetes.io/metadata.name=kube-node-lease
 kube-public       Active   20m   kubernetes.io/metadata.name=kube-public
 kube-system       Active   20m   kubernetes.io/metadata.name=kube-system
+```
 
-Deploy the HTTP Bin Application by running:
+---
 
+## 2. Deploy the HTTPBin Application
+
+```bash
 kubectl apply -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/httpbin/httpbin.yaml
-serviceaccount/httpbin created
-service/httpbin created
-deployment.apps/httpbin created
+```
 
+Verify:
+
+```bash
 kubectl get pods
+```
+
+Example output:
+
+```
 NAME                       READY   STATUS    RESTARTS   AGE
 httpbin-686d6fc899-b9dht   2/2     Running   0          56s
+```
 
-Run a test pod with nginx by executing:
+---
 
+## 3. Deploy a Test Client Pod
+
+```bash
 kubectl run test --image=nginx
-pod/test created
+kubectl get po
+```
 
-k get po
+Example:
+
+```
 NAME                       READY   STATUS    RESTARTS   AGE
 httpbin-686d6fc899-8hx55   2/2     Running   0          26s
 test                       2/2     Running   0          17s
+```
 
-Retrieve the services for the HTTP Bin App by executing the command kubectl get svc. You should observe a service named "httpbin" that is configured to listen on port 8000.
+---
 
-To test the HTTP Bin endpoint, utilize the /delayfunctionality. The httpbin workload features a /delay/<seconds> endpoint available for this purpose.
-Run the following command:
+## 4. Validate the httpbin Service
+
+```bash
+kubectl get svc
+```
+
+Expected:
+
+```
+NAME       TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)    AGE
+httpbin    ClusterIP   10.xxx.xxx.xxx   <none>        8000/TCP   3m
+```
+
+---
+
+## 5. Test the HTTPBin `/delay` Endpoint
+
+The httpbin application provides:
+
+```
+/delay/<seconds>
+```
+
+Example test:
+
+```bash
 kubectl exec -ti test -- curl --head http://httpbin.default.svc:8000/delay/5
+```
+
+Expected successful response:
+
+```
 HTTP/1.1 200 OK
-access-control-allow-credentials: true
-access-control-allow-origin: *
-content-type: application/json; charset=utf-8
-server-timing: initial_delay;dur=5000.00;desc="initial delay"
-date: Sun, 23 Nov 2025 12:54:13 GMT
+server-timing: initial_delay;dur=5000.00
 x-envoy-upstream-service-time: 5006
-server: envoy
-transfer-encoding: chunked
+```
 
-A response of HTTP/1.1 200 OK is anticipated.
+At this point the application delays but still responds normally.
 
-You can test httpbin and add 5 or 10 seconds if you want to see it in action.
+---
 
-Create a Virtual Service httpbin-vs to enforce a timeout on the HTTP Bin application. Your VirtualService should:
+# Implementing Istio Timeouts
 
-Target host httpbin
-Set timeout: 2s in the HTTP block
-Route traffic to port 8000
-Apply the Virtual Service configuration and verify its creation by executing kubectl get vs.
+---
 
+## 6. Create a VirtualService with a 2-Second Timeout
 
-The Virtual Service states that all traffic going to httpbin will time out after 2 seconds if the app doesn’t respond.
+Create **virtualservice.yaml**:
 
-kubectl apply -f virtualservice.yaml 
-virtualservice.networking.istio.io/httpbin-vs created
+```yaml
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: httpbin-vs
+spec:
+  hosts:
+    - httpbin
+  http:
+    - timeout: 2s
+      route:
+        - destination:
+            host: httpbin
+            port:
+              number: 8000
+```
 
-root@controlplane ~ ➜  kubectl get svc
-NAME         TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)    AGE
-httpbin      ClusterIP   10.109.240.230   <none>        8000/TCP   3m49s
-kubernetes   ClusterIP   10.96.0.1        <none>        443/TCP    28m
+Apply:
 
-Test the Virtual Service timeout behavior:
+```bash
+kubectl apply -f virtualservice.yaml
+kubectl get vs
+```
 
-Run this command; it should return HTTP/1.1 200 OK.
+Expected:
 
+```
+NAME         GATEWAYS   HOSTS         AGE
+httpbin-vs              ["httpbin"]   0s
+```
+
+This configuration enforces that **any request taking longer than 2 seconds will fail with a timeout**.
+
+---
+
+## 7. Test Timeout Behavior
+
+### Request that completes within 2 seconds
+
+```bash
 kubectl exec -ti test -- curl --head http://httpbin.default.svc:8000/delay/1
-HTTP/1.1 200 OK
-access-control-allow-credentials: true
-access-control-allow-origin: *
-content-type: application/json; charset=utf-8
-server-timing: initial_delay;dur=1000.00;desc="initial delay"
-date: Sun, 23 Nov 2025 12:57:55 GMT
-x-envoy-upstream-service-time: 1002
-server: envoy
-transfer-encoding: chunked
+```
 
-Then, run this command, which should return a 504 Gateway Timeout.
+Expected **200 OK**:
+
+```
+HTTP/1.1 200 OK
+server-timing: initial_delay;dur=1000.00
+x-envoy-upstream-service-time: 1002
+```
+
+### Request that exceeds timeout limit
+
+```bash
 kubectl exec -ti test -- curl --head http://httpbin.default.svc:8000/delay/5
+```
+
+Expected **504 Gateway Timeout**:
+
+```
 HTTP/1.1 504 Gateway Timeout
 content-length: 24
 content-type: text/plain
-date: Sun, 23 Nov 2025 12:58:03 GMT
 server: envoy
+```
+
+This confirms the timeout rule is being enforced by Istio.
+
+---
+
+# (Optional) Retry Policies
+
+If you'd like, I can add a complete section demonstrating:
+✔️ exponential retry delays
+✔️ per-try timeouts
+✔️ retry budgets
+✔️ visual verification using Envoy access logs
+
+---
+
+## 🎉 Lab Complete
+
+You successfully configured:
+
+✔️ Service deployment
+✔️ Routing through Istio sidecars
+✔️ HTTP timeout policies
+✔️ Validation of timeout behavior
+
+
+
