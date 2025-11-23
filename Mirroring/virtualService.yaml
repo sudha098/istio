@@ -1,0 +1,18 @@
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: echo-server
+spec:
+  hosts:
+  - echo-server
+  http:
+  - route:
+    - destination:
+        host: echo-server
+        subset: v1
+      weight: 100
+    mirror:
+      host: echo-server
+      subset: v2
+    mirrorPercentage:
+      value: 100.0
