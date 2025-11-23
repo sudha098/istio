@@ -141,13 +141,4 @@ This demonstrates that the retry behavior changes correctly as you adjust the co
 
 ---
 
-# 🎉 Retry Policy Lab Complete
-
-You have now successfully configured and validated:
-
-✔️ Retry attempts
-✔️ Per-try timeout
-✔️ RetryOn rules
-✔️ Log verification inside Envoy
-✔️ Behavior changes when retry attempts are modified
 
