@@ -1,0 +1,18 @@
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: echo-dr
+spec:
+  host: echo-server
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 1
+      http:
+        http1MaxPendingRequests: 1
+        maxRequestsPerConnection: 1
+    outlierDetection:
+      consecutive5xxErrors: 1
+      interval: 5s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 100
