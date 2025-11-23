@@ -1,0 +1,18 @@
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: hello-world-vs
+spec:
+  hosts:
+    - helloworld
+  http:
+    - fault:
+        abort:
+          percentage:
+            value: 50.0
+          httpStatus: 404
+      route:
+        - destination:
+            host: helloworld
+            port:
+              number: 5000
