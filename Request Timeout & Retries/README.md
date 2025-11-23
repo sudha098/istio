@@ -180,26 +180,6 @@ server: envoy
 
 This confirms the timeout rule is being enforced by Istio.
 
----
-
-# (Optional) Retry Policies
-
-If you'd like, I can add a complete section demonstrating:
-✔️ exponential retry delays
-✔️ per-try timeouts
-✔️ retry budgets
-✔️ visual verification using Envoy access logs
-
----
-
-## 🎉 Lab Complete
-
-You successfully configured:
-
-✔️ Service deployment
-✔️ Routing through Istio sidecars
-✔️ HTTP timeout policies
-✔️ Validation of timeout behavior
 
 
 
