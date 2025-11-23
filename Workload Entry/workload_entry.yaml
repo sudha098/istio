@@ -1,0 +1,9 @@
+apiVersion: networking.istio.io/v1
+kind: WorkloadEntry
+metadata:
+  name: external-app-we
+  namespace: default
+spec:
+  address: 10.50.0.3
+  labels:
+    app: external
