@@ -1,0 +1,32 @@
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: wikipedia-egress-gateway
+spec:
+  hosts:
+  - www.wikipedia.org
+  gateways:
+  - istio-egressgateway
+  - mesh
+  http:
+  - match:
+    - gateways:
+      - mesh
+      port: 80
+    route:
+    - destination:
+        host: istio-egressgateway.istio-system.svc.cluster.local
+        subset: wikipedia
+        port:
+          number: 80
+      weight: 100
+  - match:
+    - gateways:
+      - istio-egressgateway
+      port: 80
+    route:
+    - destination:
+        host: www.wikipedia.org
+        port:
+          number: 80
+      weight: 100
