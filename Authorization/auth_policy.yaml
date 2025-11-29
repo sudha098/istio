@@ -1,0 +1,17 @@
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: httpbin-auth-policy
+spec:
+  action: ALLOW
+  selector:
+    matchLabels:
+      app: httpbin
+  rules:
+  - from:
+    - source:
+        namespaces: ["test", "app"]
+    to:
+    - operation:
+        methods: ["GET", "HEAD"]
+        paths: ["/get"]       

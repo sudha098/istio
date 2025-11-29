@@ -1,0 +1,11 @@
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: httpbin-auth-deny-policy
+  namespace: default
+spec:
+  action: DENY
+  rules:
+    - to:
+        - operation:
+            paths: ["/delay/*"]
