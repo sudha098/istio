@@ -1,0 +1,14 @@
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-from-product
+  namespace: api
+spec:
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        namespaces: ["product"]
+    to:
+    - operation:
+        methods: ["GET","POST"]
