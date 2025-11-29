@@ -1,6 +1,3 @@
-Sure! Here's a polished GitHub README based on the lab steps you provided:
-
----
 
 # Istio Authentication Lab
 
